@@ -14,11 +14,13 @@ app.use(bodyParser.json());
 async function downloadImageWithRetry(imageUrl, outputPath, retries = 5, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     try {
+      console.log(`Tentativo ${i + 1} di scaricare immagine da: ${imageUrl}`);
       const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
       fs.writeFileSync(outputPath, response.data);
+      console.log(`Immagine scaricata e salvata in: ${outputPath}`);
       return true;
     } catch (err) {
-      console.warn(`Tentativo ${i + 1} fallito. Riprovo in ${delay}ms...`);
+      console.warn(`Fallito tentativo ${i + 1}: ${err.message}`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -29,7 +31,12 @@ app.post("/pdf", async (req, res) => {
   const testo = req.body.testo;
   const imageUrl = req.body.img;
 
+  console.log("Ricevuta richiesta PDF");
+  console.log("Testo:", testo);
+  console.log("URL immagine:", imageUrl);
+
   if (!testo || !imageUrl) {
+    console.error("Dati mancanti nella richiesta");
     return res.status(400).send("Dati mancanti");
   }
 
@@ -55,6 +62,7 @@ app.post("/pdf", async (req, res) => {
     doc.end();
 
     writeStream.on("finish", () => {
+      console.log("PDF creato con successo:", pdfPath);
       res.sendFile(pdfPath, err => {
         if (!err) {
           fs.unlinkSync(pdfPath);
@@ -63,7 +71,7 @@ app.post("/pdf", async (req, res) => {
       });
     });
   } catch (err) {
-    console.error("Errore generazione PDF:", err);
+    console.error("Errore durante la generazione del PDF:", err.message);
     res.status(500).send("Errore durante la generazione del PDF.");
   }
 });
