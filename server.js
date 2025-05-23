@@ -11,9 +11,18 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-async function downloadImage(imageUrl, outputPath) {
-  const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-  fs.writeFileSync(outputPath, response.data);
+async function downloadImageWithRetry(imageUrl, outputPath, retries = 5, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
+      fs.writeFileSync(outputPath, response.data);
+      return true;
+    } catch (err) {
+      console.warn(`Tentativo ${i + 1} fallito. Riprovo in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Impossibile scaricare l'immagine dopo vari tentativi.");
 }
 
 app.post("/pdf", async (req, res) => {
@@ -30,7 +39,7 @@ app.post("/pdf", async (req, res) => {
   const imagePath = path.join(__dirname, `immagine_${timestamp}.png`);
 
   try {
-    await downloadImage(imageUrl, imagePath);
+    await downloadImageWithRetry(imageUrl, imagePath);
 
     const writeStream = fs.createWriteStream(pdfPath);
     doc.pipe(writeStream);
@@ -63,7 +72,7 @@ app.get("/", (req, res) => {
   res.send("Server PDF attivo.");
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`Server in ascolto sulla porta ${PORT}`);
+  console.log(`Server avviato sulla porta ${PORT}`);
 });
